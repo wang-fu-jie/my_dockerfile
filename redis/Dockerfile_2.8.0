@@ -1,0 +1,121 @@
+FROM ubuntu:24.04
+LABEL version="2.8.0" description="Redis 2.8.0 debugging environment based on Ubuntu 24.04" auth="wangfujie" email="wfj914@163.com"
+
+WORKDIR /opt
+
+ARG REDIS_PACKAGE=redis-2.8.0.tar.gz
+
+ENV REDIS_HOME=/opt/redis
+ENV PATH=$REDIS_HOME/bin:$PATH
+
+RUN apt update && apt install -y vim \
+    make \
+    gcc \
+    gdb \
+    openssh-server
+
+ADD https://download.redis.io/releases/${REDIS_PACKAGE} /opt
+
+RUN mkdir /opt/redis_src && \
+    tar -zxvf /opt/${REDIS_PACKAGE} -C /opt/redis_src --strip-components=1 && \
+    cd /opt/redis_src && \
+    mkdir build && \
+    make && \
+    cd src && \
+    mv redis-cli redis-check-dump redis-benchmark redis-server redis-sentinel  redis-check-aof ../build && \
+    mv *.o ../build && \
+    rm /opt/${REDIS_PACKAGE} && \
+    mkdir -p /var/run/sshd && \
+    ssh-keygen -A && \
+    mkdir -p /run/sshd && \
+    chmod 0755 /run/sshd && \
+    sed -i 's/^#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    echo "root:1" | chpasswd && \
+    mkdir /opt/redis_src/.vscode
+
+
+RUN cd /opt/redis_src/.vscode && \
+    cat <<EOF > /opt/redis_src/.vscode/tasks.json
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Redis (debug + copy config)",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "mkdir -p build; make; cd src;  mv redis-cli redis-check-dump redis-benchmark redis-server redis-sentinel  redis-check-aof ../build; mv *.o ../build"
+            ],
+            "options": {
+                "cwd": "\${workspaceFolder}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        }
+    ]
+}
+EOF
+
+RUN cd /opt/redis_src/.vscode && \
+    cat <<EOF > /opt/redis_src/.vscode/launch.json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug redis-server",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "\${workspaceFolder}/build/redis-server",
+            "args": [
+                "redis.conf"
+            ],
+            "stopAtEntry": true,
+            "cwd": "\${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Debug redis-cli",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "\${workspaceFolder}/build/redis-cli",
+            "args": [
+                "-h",
+                "127.0.0.1",
+                "-p",
+                "6379"
+            ],
+            "stopAtEntry": true,
+            "cwd": "\${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}
+EOF
+
+CMD [ "bash", "-c", "/usr/sbin/sshd && exec bash" ]
