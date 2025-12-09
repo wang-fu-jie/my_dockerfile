@@ -3,7 +3,7 @@ LABEL version="2.8.0" description="Redis 2.8.0 debugging environment based on Ub
 
 WORKDIR /opt
 
-ARG REDIS_PACKAGE=redis-2.8.0.tar.gz
+ARG REDIS_PACKAGE=redis-3.0.0.tar.gz
 
 ENV REDIS_HOME=/opt/redis
 ENV PATH=$REDIS_HOME/bin:$PATH
@@ -23,7 +23,7 @@ RUN mkdir /opt/redis_src && \
     make && \
     cp *.conf /opt/redis_src/build && \
     cd src && \
-    mv redis-benchmark  redis-check-aof redis-check-dump  redis-cli  redis-server redis-sentinel ../build && \
+    mv redis-benchmark  redis-check-aof  redis-trib.rb redis-check-dump  redis-cli  redis-server redis-sentinel ../build && \
     mv *.o ../build && \
     rm /opt/${REDIS_PACKAGE} && \
     mkdir -p /var/run/sshd && \
@@ -46,7 +46,7 @@ RUN cd /opt/redis_src/.vscode && \
             "command": "bash",
             "args": [
                 "-c",
-                "rm -rf /opt/redis_src/build/*; make; cp *.conf /opt/redis_src/build; cd src; mv *.o ../build; mv redis-benchmark  redis-check-aof  redis-check-dump  redis-cli  redis-server redis-sentinel ../build"
+                "rm -rf /opt/redis_src/build/*; make; cp *.conf /opt/redis_src/build; cd src; mv *.o ../build; mv redis-trib.rb redis-benchmark  redis-check-aof  redis-check-dump  redis-cli  redis-server redis-sentinel ../build"
             ],
             "options": {
                 "cwd": "\${workspaceFolder}"
