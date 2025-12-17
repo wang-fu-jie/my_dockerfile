@@ -26,6 +26,7 @@ RUN mkdir /opt/redis_src && \
     cd src && \
     mv redis-benchmark  redis-check-aof  redis-trib.rb redis-check-rdb  redis-cli  redis-server redis-sentinel ../build && \
     mv *.o ../build && \
+    mv *.d ../build && \
     rm /opt/${REDIS_PACKAGE} && \
     mkdir -p /var/run/sshd && \
     ssh-keygen -A && \
@@ -47,7 +48,7 @@ RUN cd /opt/redis_src/.vscode && \
             "command": "bash",
             "args": [
                 "-c",
-                "rm -rf /opt/redis_src/build/*; make; cp *.conf /opt/redis_src/build; cd src; mv *.o ../build; mv redis-trib.rb redis-benchmark  redis-check-aof  redis-check-rdb  redis-cli  redis-server redis-sentinel ../build"
+                "rm -rf /opt/redis_src/build/*; make; cp *.conf /opt/redis_src/build; cd src; mv *.o ../build; mv *.d ../build; mv redis-trib.rb redis-benchmark  redis-check-aof  redis-check-rdb  redis-cli  redis-server redis-sentinel ../build"
             ],
             "options": {
                 "cwd": "\${workspaceFolder}"
