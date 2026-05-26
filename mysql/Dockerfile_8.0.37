@@ -1,0 +1,137 @@
+FROM ubuntu:24.04
+LABEL version="8.0.37" description="MySQL 8.0.37 debugging environment based on Ubuntu 24.04" auth="wangfujie" email="wfj914@163.com"
+
+WORKDIR /opt
+
+ARG MySQL_PACKAGE=mysql-boost-8.0.37.tar.gz
+
+ENV MYSQL_HOME=/opt/mysql
+ENV PATH=$MYSQL_HOME/bin:$PATH
+
+RUN apt update && apt install -y vim \
+    make \
+    gcc \
+    g++ \
+    gdb \
+    cmake \
+    openssh-server \
+    libaio-dev \
+    build-essential \
+    bison \
+    libncurses-dev \
+    libssl-dev \
+    pkg-config \  
+    unzip \
+    libtirpc-dev   
+
+ADD https://cdn.mysql.com/archives/mysql-8.0/mysql-boost-8.0.37.tar.gz /opt
+ADD https://codeload.github.com/datacharmer/test_db/zip/refs/heads/master /opt/test-db.zip
+
+RUN mkdir /opt/mysql_src && \
+    tar -zxvf /opt/${MySQL_PACKAGE} -C /opt/mysql_src --strip-components=1 && \
+    unzip test-db.zip && \ 
+    mkdir -p /opt/mysql/etc && \
+    mkdir -p /opt/mysql/log && \   
+    mkdir -p /opt/mysql/run && \
+    mkdir -p /opt/mysql/tmp && \
+    mkdir -p /opt/mysql/data && \
+    mkdir /opt/mysql_src/build && \
+    rm /opt/${MySQL_PACKAGE} && \
+    rm /opt/test-db.zip && \
+    mkdir -p /var/run/sshd && \
+    ssh-keygen -A && \
+    mkdir -p /run/sshd && \
+    chmod 0755 /run/sshd && \
+    sed -i 's/^#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    echo "root:1" | chpasswd && \
+    mkdir /opt/mysql_src/.vscode
+
+
+RUN cd /opt/mysql_src/build && \   
+    cmake -DCMAKE_INSTALL_PREFIX=/opt/mysql \
+          -DWITH_BOOST=/opt/mysql_src/boost/boost_1_77_0 \
+          -DWITH_DEBUG=1 \
+          ..
+ 
+RUN  cd /opt/mysql_src/build && \
+     make && \
+     make install
+
+RUN  cd /opt/mysql_src/build && cat <<EOF > /opt/mysql/etc/my.cnf
+[mysqld]
+basedir = /opt/mysql
+datadir = /opt/mysql/data
+log-error = /opt/mysql/log/error.log
+pid-file = /opt/mysql/run/mysqld.pid
+socket = /opt/mysql/run/mysql.sock
+user = root
+
+[client]
+user = root
+sock = /opt/mysql/run/mysql.sock
+EOF
+
+
+RUN cd /opt/mysql_src/build && \   
+    mysqld --defaults-file=/opt/mysql/etc/my.cnf --initialize-insecure 
+
+
+RUN cd /opt/mysql_src/.vscode && \
+    cat <<EOF > /opt/mysql_src/.vscode/launch.json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug mysql-server",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/opt/mysql/bin/mysqld",
+            "args": [
+                "--defaults-file=/opt/mysql/etc/my.cnf",
+                "--gdb"
+            ],
+            "stopAtEntry": true,
+            "cwd": "\${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Debug mysql-cli",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/opt/mysql/bin/mysql",
+            "args": [
+                "-h",
+                "127.0.0.1",
+                "-p",
+                "3306"
+            ],
+            "stopAtEntry": true,
+            "cwd": "\${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}
+EOF
+
+
+CMD [ "bash", "-c", "/usr/sbin/sshd && exec bash" ]
